@@ -25,8 +25,8 @@ import "highlight.js/styles/base16/dracula.css";
 import "react-toggle/style.css";
 import "styles/index.scss";
 
-export default ({ Component, pageProps }) => (
-  <ThemeProvider>
-    <Component {...pageProps} />
-  </ThemeProvider>
-);
+const App = ({ Component, pageProps }) => <ThemeProvider>
+  <Component {...pageProps} />
+</ThemeProvider>;
+
+export default App;
