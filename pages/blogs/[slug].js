@@ -1,49 +1,74 @@
+import { useEffect, useState } from "react";
 import PageLayout from "components/PageLayout";
 import BlogHeader from "components/BlogHeader";
-import { getBlogBySlug, getAllBlogs } from "lib/api";
+import ErrorPage from "next/error";
+import { getBlogBySlug, getAllBlogs, onBlogUpdate } from "lib/api";
 import { Row, Col } from "react-bootstrap";
+import { urlFor } from "lib/api";
+import moment from "moment";
+import { useRouter } from "next/router";
 
-const BlogDetail = ({ blog }) => {
+import BlogContent from "components/BlogContent";
+import PreviewAlert from "components/PreviewAlert";
+
+const BlogDetail = ({ blog: initialBlog, preview }) => {
+  const router = useRouter();
+  const [blog, setBlog] = useState(initialBlog);
+
+  useEffect(() => {
+    let sub;
+    if (preview) {
+      sub = onBlogUpdate(blog.slug).subscribe((update) => {
+        setBlog(update.result);
+      });
+    }
+
+    return () => sub && sub.unsubscribe();
+  }, []);
+
+  // if (!router.isFallback && !blog?.slug) {
+  //   return <ErrorPage statusCode="404"/>
+  // }
+
+  if (router.isFallback) {
+    return <PageLayout className="blog-detail-page">Loading...</PageLayout>;
+  }
+
   return (
     <PageLayout className="blog-detail-page">
       <Row>
         <Col md={{ span: 10, offset: 1 }}>
+          {preview && <PreviewAlert />}
           <BlogHeader
             title={blog.title}
             subtitle={blog.subtitle}
-            coverImage={blog.coverImage}
+            coverImage={urlFor(blog.coverImage).height(600).url()}
             author={blog.author}
-            date={blog.date}
+            date={moment(blog.date).format("LL")}
           />
           <hr />
-          {/* Blog Content Here */}
-          It is a long established fact that a reader will be distracted by the
-          readable content of a page when looking at its layout. The point of
-          using Lorem Ipsum is that it has a more-or-less normal distribution of
-          letters, as opposed to using 'Content here, content here', making it
-          look like readable English. Many desktop publishing packages and web
-          page editors now use Lorem Ipsum as their default model text, and a
-          search for 'lorem ipsum' will uncover many web sites still in their
-          infancy. Various versions have evolved over the years, sometimes by
-          accident, sometimes on purpose (injected humour and the like).
+          {blog.content && <BlogContent content={blog.content} />}
         </Col>
       </Row>
     </PageLayout>
   );
 };
 
-export async function getStaticProps({ params }) {
-  const blog = await getBlogBySlug(params.slug);
+export async function getStaticProps({ params, preview = false, previewData }) {
+  const blog = await getBlogBySlug(params.slug, preview);
   return {
-    props: { blog },
+    props: { blog, preview },
+    unstable_revalidate: 1,
   };
 }
 
+// TODO: Introduce fallback
 export async function getStaticPaths() {
   const blogs = await getAllBlogs();
+  const paths = blogs?.map((b) => ({ params: { slug: b.slug } }));
   return {
-    paths: blogs?.map((b) => ({ params: { slug: b.slug } })),
-    fallback: false,
+    paths,
+    fallback: true,
   };
 }
 
